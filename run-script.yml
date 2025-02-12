@@ -7,3 +7,9 @@
       command: python3 gcp-vCPUandRam-updator.py
       args:
         chdir: "{{ playbook_dir }}"
+      register: script_output  # Captures the script output
+
+    - name: Show Script Output
+      debug:
+        msg: "{{ script_output.stdout }}"  # Displays the captured output
+
