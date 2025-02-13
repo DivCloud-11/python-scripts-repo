@@ -1,15 +1,67 @@
----
-- name: Run Python Script
-  hosts: localhost
-  gather_facts: no
+- name: Configure RHEL 8 Servers
+  hosts: rhel8_servers
+  become: yes
+  vars:
+    new_user: "testuser"
+    user_password: "Test@123"
+  
   tasks:
-    - name: Run Python Script
-      command: python3 gcp-vCPUandRam-updator.py
-      args:
-        chdir: "{{ playbook_dir }}"
-      register: script_output  # Captures the script output
+    - name: Update all packages
+      yum:
+        name: "*"
+        state: latest
 
-    - name: Show Script Output
-      debug:
-        msg: "{{ script_output.stdout }}"  # Displays the captured output
+    - name: Set root password as the VM hostname
+      command: "echo root:{{ inventory_hostname }} | chpasswd"
 
+    - name: Create a new user
+      user:
+        name: "{{ new_user }}"
+        password: "{{ user_password | password_hash('sha512') }}"
+        shell: /bin/bash
+        state: present
+
+    - name: Add user to sudoers
+      lineinfile:
+        path: /etc/sudoers
+        line: "{{ new_user }} ALL=(ALL) NOPASSWD:ALL"
+        validate: "visudo -cf %s"
+
+    - name: Install Apache
+      yum:
+        name: httpd
+        state: present
+
+    - name: Enable and start Apache service
+      systemd:
+        name: httpd
+        state: started
+        enabled: yes
+
+    - name: Create index.html for testing
+      copy:
+        dest: /var/www/html/index.html
+        content: "<h1>Welcome to {{ inventory_hostname }}</h1>"
+        mode: '0644'
+
+    - name: Allow HTTP and HTTPS in firewall
+      firewalld:
+        service: "{{ item }}"
+        permanent: yes
+        state: enabled
+      loop:
+        - http
+        - https
+
+    - name: Reload firewall
+      command: firewall-cmd --reload
+
+    - name: Disable SELinux
+      selinux:
+        state: disabled
+
+    - name: Ensure SELinux is disabled in config
+      replace:
+        path: /etc/selinux/config
+        regexp: '^SELINUX=enforcing'
+        replace: 'SELINUX=disabled'
