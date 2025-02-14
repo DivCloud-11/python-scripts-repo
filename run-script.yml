@@ -11,9 +11,6 @@
         name: "*"
         state: latest
 
-    - name: Set root password as the VM hostname
-      command: "echo root:{{ inventory_hostname }} | chpasswd"
-
     - name: Create a new user
       user:
         name: "{{ new_user }}"
